@@ -16,6 +16,8 @@
     }
 
     canvas {
+      display: block;
+      margin: 0 auto;
       border: 2px solid white;
       width: 100%;
       max-width: 640px;
@@ -32,6 +34,18 @@
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
+
+  function resizeCanvas() {
+    // Get device width & height
+    canvas.width = window.innerWidth * 0.95;  // 95% of screen width
+    canvas.height = window.innerHeight * 0.9; // 90% of screen height
+  }
+  // Initial resize
+  resizeCanvas();
+  // Resize again if device orientation changes
+  window.addEventListener("resize", resizeCanvas);
+
+
   
   // --------------------
   // Paddle (Player)
@@ -365,6 +379,7 @@
 
 </body>
 </html>
+
 
 
 
