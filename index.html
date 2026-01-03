@@ -8,370 +8,251 @@
     body {
       margin: 0;
       background: black;
+      overflow: hidden;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      overflow: hidden;
     }
 
     canvas {
       display: block;
-      margin: 0 auto;
-      border: 2px solid white;
-      width: 100%;
-      max-width: 400px;
       touch-action: none;
     }
   </style>
 </head>
 <body>
 
-<canvas id="game" width="360" height="640"></canvas>
+<canvas id="game"></canvas>
 
 <script>
-/* Kyle 2026. I know this code is pretty messy, it involved a lot of me asking ChatGPT the best ways to implement features and then incrementally copying and pasting. But I learned a lot. */
-
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
 
-  function resizeCanvas() {
-    // Get device width & height
-    canvas.height = window.innerHeight * 0.9; // 90% of screen height
-    canvas.width = canvas.height * 0.75 
-  }
-  // Initial resize
-  resizeCanvas();
-  // Resize again if device orientation changes
-  window.addEventListener("resize", resizeCanvas);
-
-
-  
-  // --------------------
-  // Paddle (Player)
-  // --------------------
-  const paddleWidth = 100;
-  const paddleHeight = 12;
-  const paddleY = canvas.height - 60;
-  let paddleX = (canvas.width - paddleWidth) / 2;
-
-  // Computer paddle (top)
-  const cpuPaddleWidth = 100;
-  const cpuPaddleHeight = 12;
-  const cpuPaddleY = 40;
-  let cpuPaddleX = (canvas.width - cpuPaddleWidth) / 2;
-
-  // How fast the computer can move (lower = easier)
-  const cpuSpeed = 0.06;
-
-  // Initialize scores
-  let playerScore = 0;
-  let cpuScore = 0;
-  const WIN_SCORE = 9;
-
-
-
-
-
-  // --------------------
-  // Ball
-  // --------------------
-  const ballRadius = 16;
-  const ballSize = 64; 
-  let ballX = canvas.width / 2;
-  let ballY = canvas.height / 2;
-  let ballVX = 3;
-  let ballVY = 3;
-  const maxBounceAngle = Math.PI / 3; // 60 degrees
-  let ballSpeed = 4;                 // base speed
-  const speedIncrease = 0.2;         // per hit
-
-
-
-
-  // --------------------
-  // Input (Mouse + Touch)
-  // --------------------
-  function updatePaddle(x) {
-    paddleX = x - paddleWidth / 2;
-
-    // Clamp paddle inside canvas
-    if (paddleX < 0) paddleX = 0;
-    if (paddleX + paddleWidth > canvas.width) {
-      paddleX = canvas.width - paddleWidth;
-    }
-  }
-
-  canvas.addEventListener("mousemove", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    updatePaddle(e.clientX - rect.left);
-  });
-
-  canvas.addEventListener(
-    "touchmove",
-    (e) => {
-      e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      updatePaddle(e.touches[0].clientX - rect.left);
-    },
-    { passive: false }
-  );
-
-
-  // --------------------
-  // Game State
-  // --------------------
-  let gameState = "start"; // "start", "playing", "win", "lose"
-
-  // --------------------
-  // Start game functions
-  // --------------------
-  function startGame() {
-    if (gameState = "playing") return;
-    resetBall();
-  }
-  canvas.addEventListener("click", startGame);
-  canvas.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    startGame();
-  }, { passive: false });
-
-  // --------------------
-  // Ball Image
-  // --------------------
   const ballImage = new Image();
   ballImage.src = "Ball.png";
 
 
-
-
-
-
   // --------------------
-  // Game Loop
+  // Responsive sizing
   // --------------------
-  function update() {
-    //Check if the game is started
-    if (gameState !== "playing") return;
+  let paddleWidth, paddleHeight, paddleY;
+  let cpuPaddleWidth, cpuPaddleHeight, cpuPaddleY;
+  let ballRadius;
 
-    // Move computer paddle toward the ball
-    const cpuCenter = cpuPaddleX + cpuPaddleWidth / 2;
-    const diff = ballX - cpuCenter;
+  function resizeCanvas() {
+    canvas.width = window.innerWidth * 0.95;
+    canvas.height = window.innerHeight * 0.9;
 
-    cpuPaddleX += diff * cpuSpeed;
+    // Scale game elements proportionally
+    paddleWidth = canvas.width * 0.28;
+    paddleHeight = canvas.height * 0.018;
+    paddleY = canvas.height - canvas.height * 0.07;
 
-    // Clamp inside canvas
-    if (cpuPaddleX < 0) cpuPaddleX = 0;
-    if (cpuPaddleX + cpuPaddleWidth > canvas.width) {
-        cpuPaddleX = canvas.width - cpuPaddleWidth;
-    }
+    cpuPaddleWidth = paddleWidth;
+    cpuPaddleHeight = paddleHeight;
+    cpuPaddleY = canvas.height * 0.04;
 
-    // Move ball
-    ballX += ballVX;
-    ballY += ballVY;
+    ballRadius = canvas.width * 0.018;
 
-    // Left / Right wall bounce
-    if (ballX - ballRadius < 0 || ballX + ballRadius > canvas.width) {
-      ballVX *= -1;
-    }
-
-    // Paddle collision (bottom/Player side)
-    if (
-        ballY + ballRadius > paddleY &&
-        ballY + ballRadius < paddleY + paddleHeight &&
-        ballX > paddleX &&
-        ballX < paddleX + paddleWidth &&
-        ballVY > 0
-    ) {
-        // Where did the ball hit the paddle?
-        const paddleCenter = paddleX + paddleWidth / 2;
-        const hitOffset = (ballX - paddleCenter) / (paddleWidth / 2);
-
-        // Clamp between -1 and 1
-        const clamped = Math.max(-1, Math.min(1, hitOffset));
-
-        // Convert to angle
-        const angle = clamped * maxBounceAngle;
-
-        // Increase speed
-        ballSpeed += speedIncrease;
-
-        // Set new velocity
-        ballVX = ballSpeed * Math.sin(angle);
-        ballVY = -ballSpeed * Math.cos(angle);
-
-        // Prevent sticking
-        ballY = paddleY - ballRadius;
-    }  
-
-    // Computer paddle collision (top)
-    if (
-        ballY - ballRadius < cpuPaddleY + cpuPaddleHeight &&
-        ballY - ballRadius > cpuPaddleY &&
-        ballX > cpuPaddleX &&
-        ballX < cpuPaddleX + cpuPaddleWidth &&
-        ballVY < 0
-    ) {
-        const paddleCenter = cpuPaddleX + cpuPaddleWidth / 2;
-        const hitOffset = (ballX - paddleCenter) / (cpuPaddleWidth / 2);
-
-        const clamped = Math.max(-1, Math.min(1, hitOffset));
-        const angle = clamped * maxBounceAngle;
-
-        ballSpeed += speedIncrease;
-
-        ballVX = ballSpeed * Math.sin(angle);
-        ballVY = ballSpeed * Math.cos(angle);
-
-        ballY = cpuPaddleY + cpuPaddleHeight + ballRadius;
-    }
-
-    
-    // Player scores (ball goes past top)
-    if (ballY + ballRadius < 0) {
-        playerScore++;
-
-        if (playerScore >= WIN_SCORE) {
-            gameState = "win";
-        } else {
-            resetPoint();
-        }
-    }
-
-    // CPU scores (ball goes past bottom)
-    if (ballY - ballRadius > canvas.height) {
-        cpuScore++;
-
-        if (cpuScore >= WIN_SCORE) {
-            gameState = "lose";
-        } else {
-            resetPoint();
-        }
-    }
+    // Re-center paddles
+    let paddleX = (canvas.width - paddleWidth) / 2;
+    let cpuPaddleX = (canvas.width - cpuPaddleWidth) / 2;
   }
 
-  function resetBall() {
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+
+  // --------------------
+  // Game state
+  // --------------------
+  const WIN_SCORE = 9;
+  let gameState = "start"; // start | playing | win | lose
+
+  let playerScore = 0;
+  let cpuScore = 0;
+
+  // --------------------
+  // Paddles
+  // --------------------
+  let paddleX = 0;
+  let cpuPaddleX = 0;
+  const cpuSpeed = 0.04;
+
+  // --------------------
+  // Ball
+  // --------------------
+  let ballX = 0;
+  let ballY = 0;
+  let ballVX = 0;
+  let ballVY = 0;
+
+  let ballSpeed = 4;
+  const speedIncrease = 0.25;
+  const maxBounceAngle = Math.PI / 3;
+
+  function resetBallForServe() {
     ballX = canvas.width / 2;
     ballY = canvas.height / 2;
-
-    ballVX = Math.random() > 0.5 ? 3 : -3;
-    ballVY = 3;
-  }
-
-  function resetPoint() {
-    gameState = "start";
-
-    ballX = canvas.width / 2;
-    ballY = canvas.height / 2;
-
-    ballSpeed = 4;
+    ballSpeed = canvas.width * 0.01;
 
     const angle = (Math.random() * 2 - 1) * maxBounceAngle;
     ballVX = ballSpeed * Math.sin(angle);
     ballVY = Math.random() > 0.5 ? ballSpeed : -ballSpeed;
   }
 
+  // --------------------
+  // Input
+  // --------------------
+  function updatePaddle(x) {
+    paddleX = x - paddleWidth / 2;
+    if (paddleX < 0) paddleX = 0;
+    if (paddleX + paddleWidth > canvas.width) {
+      paddleX = canvas.width - paddleWidth;
+    }
+  }
+
+  canvas.addEventListener("mousemove", e => {
+    const rect = canvas.getBoundingClientRect();
+    updatePaddle(e.clientX - rect.left);
+  });
+
+  canvas.addEventListener("touchmove", e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    updatePaddle(e.touches[0].clientX - rect.left);
+  }, { passive: false });
+
+  canvas.addEventListener("click", startGame);
+  canvas.addEventListener("touchstart", e => {
+    e.preventDefault();
+    startGame();
+  }, { passive: false });
+
+  function startGame() {
+    if (gameState === "playing") return;
+
+    if (gameState === "win" || gameState === "lose") {
+      playerScore = 0;
+      cpuScore = 0;
+    }
+
+    gameState = "playing";
+    resetBallForServe();
+  }
+
+  // --------------------
+  // Game loop
+  // --------------------
+  function update() {
+    if (gameState !== "playing") return;
+
+    ballX += ballVX;
+    ballY += ballVY;
+
+    // Side walls
+    if (ballX - ballRadius < 0 || ballX + ballRadius > canvas.width) {
+      ballVX *= -1;
+    }
+
+    // CPU movement
+    const cpuCenter = cpuPaddleX + cpuPaddleWidth / 2;
+    cpuPaddleX += (ballX - cpuCenter) * cpuSpeed;
+    cpuPaddleX = Math.max(0, Math.min(canvas.width - cpuPaddleWidth, cpuPaddleX));
+
+    // Player paddle collision
+    if (
+      ballY + ballRadius > paddleY &&
+      ballX > paddleX &&
+      ballX < paddleX + paddleWidth &&
+      ballVY > 0
+    ) {
+      const offset = (ballX - (paddleX + paddleWidth / 2)) / (paddleWidth / 2);
+      const angle = offset * maxBounceAngle;
+
+      ballSpeed += speedIncrease;
+      ballVX = ballSpeed * Math.sin(angle);
+      ballVY = -ballSpeed * Math.cos(angle);
+      ballY = paddleY - ballRadius;
+    }
+
+    // CPU paddle collision
+    if (
+      ballY - ballRadius < cpuPaddleY + cpuPaddleHeight &&
+      ballX > cpuPaddleX &&
+      ballX < cpuPaddleX + cpuPaddleWidth &&
+      ballVY < 0
+    ) {
+      const offset = (ballX - (cpuPaddleX + cpuPaddleWidth / 2)) / (cpuPaddleWidth / 2);
+      const angle = offset * maxBounceAngle;
+
+      ballSpeed += speedIncrease;
+      ballVX = ballSpeed * Math.sin(angle);
+      ballVY = ballSpeed * Math.cos(angle);
+      ballY = cpuPaddleY + cpuPaddleHeight + ballRadius;
+    }
+
+    // Scoring
+    if (ballY + ballRadius < 0) {
+      playerScore++;
+      gameState = playerScore >= WIN_SCORE ? "win" : "start";
+    }
+
+    if (ballY - ballRadius > canvas.height) {
+      cpuScore++;
+      gameState = cpuScore >= WIN_SCORE ? "lose" : "start";
+    }
+  }
+
+  function drawOverlay(title, subtitle = "") {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "white";
+    ctx.textAlign = "center";
+    ctx.font = "36px sans-serif";
+    ctx.fillText(title, canvas.width / 2, canvas.height / 2);
+
+    if (subtitle) {
+      ctx.font = "18px sans-serif";
+      ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 30);
+    }
+  }
+
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Text format
+    // Scores
     ctx.fillStyle = "white";
     ctx.font = "20px sans-serif";
     ctx.textAlign = "center";
-
-    // CPU score (top)
     ctx.fillText(cpuScore, canvas.width / 2, 30);
-
-    // Player score (bottom)
     ctx.fillText(playerScore, canvas.width / 2, canvas.height - 20);
 
-
-
-
-
-    // Paddle
-    ctx.fillStyle = "white";
+    // Paddles
     ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
-
-    // Computer paddle
-    ctx.fillStyle = "white";
     ctx.fillRect(cpuPaddleX, cpuPaddleY, cpuPaddleWidth, cpuPaddleHeight);
 
     // Ball
     if (ballImage.complete) {
+    const size = ballRadius * 2;
         ctx.drawImage(
             ballImage,
-            ballX - ballSize / 2,
-            ballY - ballSize / 2,
-            ballSize,
-            ballSize
+            ballX - size / 2,
+            ballY - size / 2,
+            size,
+            size
         );
     }
-    
-    // Draw Overlays
-    if (gameState === "start") {
-        drawOverlay("Tap to Start", "First to score 9 wins (Best of 17)");
-    }
 
-    if (gameState === "win") {
-        drawOverlay("🎉 You Win!", "Happy 17th Birthday, Mathew!");
-    }
-
-    if (gameState === "lose") {
-        drawOverlay("😞 Game Over", "No presents for Mathew...");
-    }
-    
-    //If the game isn't started, draw the Intro overlay
-/*    if (!gameStarted) {
-        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.fillStyle = "white";
-        ctx.textAlign = "center";
-
-        ctx.font = "32px sans-serif";
-        ctx.fillText("Tap to Start", canvas.width / 2, canvas.height / 2 - 40 );
-
-        ctx.font = "16px sans-serif";
-        ctx.fillText(
-            "Move paddle left and right",
-        canvas.width / 2,
-        canvas.height / 2 + 50);
-
-        ctx.font = "12 px sans-serif";
-        ctx.fillText(
-            "First to score 9 wins (Best of 17)",
-        canvas.width / 2,
-        canvas.height / 2 + 70);
-    }*/
-
-    requestAnimationFrame(loop);
+    if (gameState === "start") drawOverlay("Tap to Start", "Winner is the to 9 points (Best of 17)");
+    if (gameState === "win") drawOverlay("🎉 You Win!", "Happy 17th Birthday, Mathew!");
+    if (gameState === "lose") drawOverlay("😞 Game Over", "No presents for Mathew...");
   }
-
-
-
-    //Define overlay formatting
-    function drawOverlay(title, subtitle = "") {
-        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.fillStyle = "white";
-        ctx.textAlign = "center";
-
-        ctx.font = "36px sans-serif";
-        ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 40);
-
-        if (subtitle) {
-            ctx.font = "18px sans-serif";
-            ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 50);
-        }
-    }
-
-
 
   function loop() {
     update();
     draw();
+    requestAnimationFrame(loop);
   }
 
   loop();
@@ -379,10 +260,3 @@
 
 </body>
 </html>
-
-
-
-
-
-
-
